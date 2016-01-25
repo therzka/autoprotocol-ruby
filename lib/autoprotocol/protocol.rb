@@ -713,7 +713,7 @@ module Autoprotocol
       end
       columns = []
       (0..ref.container_type.col_count).each do |col|
-        columns.append({"column" => col, "volume" => volume})
+        columns.push({"column" => col, "volume" => volume})
       end
       self.dispense(ref, reagent, columns, speed_percentage)
     end
