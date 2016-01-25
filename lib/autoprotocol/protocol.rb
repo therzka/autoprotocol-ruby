@@ -461,9 +461,9 @@ module Autoprotocol
 
 
     # Distribute liquid from source well(s) to destination wells(s).
-    # 
+    #
     #  === Example Usage:
-    #        
+    #
     #      p = Protocol()
     #      sample_plate = p.ref("sample_plate",
     #                           None,
@@ -479,9 +479,9 @@ module Autoprotocol
     #                   mix_before=True,
     #                   mix_vol="500:microliter",
     #                   repetitions=20)
-    # 
+    #
     # === Autoprotocol Output:
-    #    
+    #
     #      "instructions": [
     #        {
     #          "groups": [
@@ -533,9 +533,9 @@ module Autoprotocol
     #          "op": "pipette"
     #        }
     #      ]
-    # 
+    #
     # === Parameters
-    #   
+    #
     #   * source : Well, WellGroup
     #         Well or wells to distribute liquid from.  If passed as a WellGroup
     #         with set_volume() called on it, liquid will be automatically be
@@ -571,7 +571,7 @@ module Autoprotocol
     #         specified if aspirate_source is also specified. By default this is
     #         the maximum aspiration speed, with the start speed being half of
     #         the speed specified.
-    #  
+    #
     # === Raises
     #   * RuntimeError
     #       If no mix volume is specified for the mix_before instruction.
@@ -583,14 +583,13 @@ module Autoprotocol
                    mix_before: false, mix_vol: nil, repetitions: 10,
                    flowrate: "100:microliter/second", aspirate_speed: nil,
                    new_group: false)
-      
+
       groups = Array.new
       dists = self._fill_wells dest, source, volume
 
       dists.each{ |d|
-        puts d.to_h.to_json
         opts = Hash.new
-        if mix_before && !mix_vol 
+        if mix_before && !mix_vol
           opts["mix_before"] = {
             "volume" => mix_vol,
             "repetitions" => repetitions,
@@ -615,7 +614,7 @@ module Autoprotocol
       else
         self._pipette groups
       end
-      
+
     end
 
 
@@ -767,7 +766,7 @@ module Autoprotocol
       if wells.is_a? WellGroup
         wells = wells.indices()
       end
-      self.instructions.append(Luminescence.new(ref: ref, wells: wells, dataref: dataref))
+      self.append(Luminescence.new(ref: ref, wells: wells, dataref: dataref))
     end
 
     # Move plate to designated thermoisolater or ambient area for incubation
@@ -802,7 +801,7 @@ module Autoprotocol
     #         }
     #       ]
     def incubate(ref, where, duration, shaking: false, co2: 0)
-      self.instructions.append(Incubate.new(ref:ref, where:where, duration:duration, shaking:shaking, co2:co2))
+      self.append(Incubate.new(ref:ref, where:where, duration:duration, shaking:shaking, co2:co2))
     end
 
     # Returns the entire protocol as a hash
@@ -871,9 +870,9 @@ module Autoprotocol
 
     # Distribute liquid to a WellGroup, sourcing the liquid from a group
     # of wells all containing the same substance.
-    # 
+    #
     # === Parameters
-    # 
+    #
     # * dst_group : WellGroup
     #     WellGroup to distribute liquid to
     # * src_group : WellGroup
@@ -881,12 +880,12 @@ module Autoprotocol
     # * volume : str, Unit
     #     volume of liquid to be distributed to each destination well
     # === Returns
-    # 
+    #
     # distributes : list
     #     List of distribute groups
-    # 
+    #
     # === Raises
-    # 
+    #
     # RuntimeError
     #     if source wells run out of liquid before distributing to all
     #     designated destination wells
@@ -911,7 +910,7 @@ module Autoprotocol
           volume = [Unit.fromstring(volume)] * dst_group.wells.length
       end
 
-      src_group.wells.each { |w| 
+      src_group.wells.each { |w|
         distributes.push({
           "from" => w,
           "to" => []
@@ -930,10 +929,10 @@ module Autoprotocol
             else
               d.volume = v
             end
-          end 
-          } 
+          end
+          }
         }
-        
+
       distributes
     end
 
@@ -979,7 +978,7 @@ module Autoprotocol
       if self.instructions.length > 0 && self.instructions[-1].op == 'pipette'
         self.instructions[-1].groups += groups
       else
-        self.instructions.push(Pipette.new(groups: groups))
+        self.append(Pipette.new(groups: groups))
       end
     end
 
