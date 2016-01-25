@@ -14,7 +14,7 @@ module Autoprotocol
       if wells.is_a? Well
         wells = [wells]
       elsif wells.is_a? WellGroup
-        wells = well.wells
+        wells = wells.wells
       end
       self.wells = wells
     end

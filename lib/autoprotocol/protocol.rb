@@ -253,23 +253,6 @@ module Autoprotocol
     # * dispense_speed : str, Unit, optional
     #       Speed at which to dispense liquid into the destination well.  May
     #       not be specified if dispense_target is also specified.
-    # * aspirate_source : fn, optional
-    #       Can't be specified if aspirate_speed is also specified.
-    # * dispense_target : fn, optional
-    #       Same but opposite of  aspirate_source.
-    # * pre_buffer : str, Unit, optional
-    #       Volume of air aspirated before aspirating liquid.
-    # * disposal_vol : str, Unit, optional
-    #       Volume of extra liquid to aspirate that will be dispensed into
-    #       trash afterwards.
-    # * transit_vol : str, Unit, optional
-    #       Volume of air aspirated after aspirating liquid to reduce presence
-    #       of bubbles at pipette tip.
-    # * blowout_buffer : bool, optional
-    #       If true the operation will dispense the pre_buffer along with the
-    #       dispense volume. Cannot be true if disposal_vol is specified.
-    # * tip_type : str, optional
-    #       Type of tip to be used for the transfer operation.
     # * new_group : bool, optional
     #
     # === Raises
@@ -282,9 +265,7 @@ module Autoprotocol
     #       number of wells and one_source is not true.
     def transfer(source, dest, volume, one_source: false, one_tip: false,
                  aspirate_speed: nil, dispense_speed: nil,
-                 aspirate_source: nil, dispense_target: nil, pre_buffer: nil,
-                 disposal_vol: nil, transit_vol: nil, blowout_buffer: nil,
-                 tip_type: nil, new_group: false, **mix_kwargs)
+                 new_group: false, **mix_kwargs)
 
       source = WellGroup.new(source)
       dest = WellGroup.new(dest)
@@ -355,17 +336,17 @@ module Autoprotocol
               vol_d = volume[idx]
               while vol_d > Unit.fromstring("0:microliter") do
                 if vol > vol_d
-                  sources.append(s)
-                  destinations.append(d)
-                  volumes.append(vol_d)
+                  sources.push(s)
+                  destinations.push(d)
+                  volumes.push(vol_d)
                   vol -= vol_d
                   vol.value = vol.value.round(max_decimal_places)
                   vol_d -= vol_d
                   vol_d.value = vol_d.value.round(max_decimal_places)
                 else
-                  sources.append(s)
-                  destinations.append(d)
-                  volumes.append(vol)
+                  sources.push(s)
+                  destinations.push(d)
+                  volumes.push(vol)
                   vol_d -= vol
                   vol_d.value = vol_d.value.round(max_decimal_places)
                   source_counter += 1
@@ -446,36 +427,30 @@ module Autoprotocol
           }
         end
         # Append transfer options
-        opt_list = ["aspirate_speed", "dispense_speed"]
-        opt_list.each do |option|
-          xfer[option] = option
+        if aspirate_speed
+          xfer['aspirate_speed'] = aspirate_speed
         end
-        x_opt_list = ["x_aspirate_source", "x_dispense_target",
-                      "x_pre_buffer", "x_disposal_vol", "x_transit_vol",
-                      "x_blowout_buffer"]
-        x_opt_list.each do |x_option|
-          xfer[x_option] = x_option[2..-1]
+        if dispense_speed
+          xfer['dispense_speed'] = dispense_speed
         end
         if volume.value > 0
           opts.push xfer
         end
 
         trans = {}
-        trans['x_tip_type'] = tip_type
         if one_tip
           trans["transfer"] = opts
           if new_group
-            self.append(Pipette.new([trans]))
+            self.push(Pipette.new([trans]))
           else
             self._pipette([trans])
           end
         else
           opts.each do |x|
             trans = {}
-            trans['x_tip_type'] = tip_type
             trans["transfer"] = [x]
             if new_group
-              self.append(Pipette.new([trans]))
+              self.push(Pipette.new([trans]))
             else
               self._pipette([trans])
             end
