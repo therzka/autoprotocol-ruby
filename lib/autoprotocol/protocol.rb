@@ -459,6 +459,166 @@ module Autoprotocol
       end
     end
 
+
+    # Distribute liquid from source well(s) to destination wells(s).
+    # 
+    #  === Example Usage:
+    #        
+    #      p = Protocol()
+    #      sample_plate = p.ref("sample_plate",
+    #                           None,
+    #                           "96-flat",
+    #                           storage="warm_37")
+    #      sample_source = p.ref("sample_source",
+    #                            "ct32kj234l21g",
+    #                            "micro-1.5",
+    #                            storage="cold_20")
+    #      p.distribute(sample_source.well(0),
+    #                   sample_plate.wells_from(0,8,columnwise=True),
+    #                   "200:microliter",
+    #                   mix_before=True,
+    #                   mix_vol="500:microliter",
+    #                   repetitions=20)
+    # 
+    # === Autoprotocol Output:
+    #    
+    #      "instructions": [
+    #        {
+    #          "groups": [
+    #            {
+    #              "distribute": {
+    #                "to": [
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/0"
+    #                  },
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/12"
+    #                  },
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/24"
+    #                  },
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/36"
+    #                  },
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/48"
+    #                  },
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/60"
+    #                  },
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/72"
+    #                  },
+    #                  {
+    #                    "volume": "150.0:microliter",
+    #                    "well": "sample_plate/84"
+    #                  }
+    #                ],
+    #                "from": "sample_source/0",
+    #                "mix_before": {
+    #                  "volume": "500:microliter",
+    #                  "repetitions": 20,
+    #                  "speed": "100:microliter/second"
+    #                }
+    #              }
+    #            }
+    #          ],
+    #          "op": "pipette"
+    #        }
+    #      ]
+    # 
+    # === Parameters
+    #   
+    #   * source : Well, WellGroup
+    #         Well or wells to distribute liquid from.  If passed as a WellGroup
+    #         with set_volume() called on it, liquid will be automatically be
+    #         drawn from the wells specified using the fill_wells function.
+    #   * dest : Well, WellGroup
+    #         Well or wells to distribute liquid to.
+    #   * volume : str, Unit, list
+    #         Volume of liquid to be distributed to each destination well.  If a
+    #         single string or unit is passed to represent the volume, that
+    #         volume will be distributed to each destination well.  If a list of
+    #         volumes is provided, that volume will be distributed to the
+    #         corresponding well in the WellGroup provided. The length of the
+    #         volumes list must therefore match the number of wells in the
+    #         destination WellGroup if destination wells are recieving different
+    #         volumes.
+    #   * allow_carryover : bool, optional
+    #         specify whether the same pipette tip can be used to aspirate more
+    #         liquid from source wells after the previous volume aspirated has
+    #         been depleted.
+    #   * mix_before : bool, optional
+    #         Specify whether to mix the liquid in the destination well before
+    #         liquid is transferred.
+    #   * mix_vol : str, Unit, optional
+    #         Volume to aspirate and dispense in order to mix liquid in a wells
+    #         before liquid is distributed.
+    #   * repetitions : int, optional
+    #         Number of times to aspirate and dispense in order to mix
+    #         liquid in a well before liquid is distributed.
+    #   * flowrate : str, Unit, optional
+    #         Speed at which to mix liquid in well before liquid is distributed.
+    #   * aspirate speed : str, Unit, optional
+    #         Speed at which to aspirate liquid from source well.  May not be
+    #         specified if aspirate_source is also specified. By default this is
+    #         the maximum aspiration speed, with the start speed being half of
+    #         the speed specified.
+    #  
+    # === Raises
+    #   * RuntimeError
+    #       If no mix volume is specified for the mix_before instruction.
+    #   * ValueError
+    #       If source and destination well(s) is/are not expressed as either
+    #       Wells or WellGroups.
+
+    def distribute(source, dest, volume, allow_carryover: false,
+                   mix_before: false, mix_vol: nil, repetitions: 10,
+                   flowrate: "100:microliter/second", aspirate_speed: nil,
+                   new_group: false)
+      
+      groups = Array.new
+      dists = self._fill_wells dest, source, volume
+
+      dists.each{ |d|
+        puts d.to_h.to_json
+        opts = Hash.new
+        if mix_before && !mix_vol 
+          opts["mix_before"] = {
+            "volume" => mix_vol,
+            "repetitions" => repetitions,
+            "speed" => flowrate
+          }
+        elsif mix_before && !mix_vol
+          RuntimeError.new "No mix volume specified for mix_before"
+        end
+        opts["allow_carryover"] = allow_carryover
+        opts["from"] = d["from"]
+        opts["to"] = d["to"]
+
+        # Append distribute options
+        if aspirate_speed
+          opts['aspirate_speed'] = aspirate_speed
+        end
+        groups.push({"distribute": opts })
+      }
+
+      if new_group
+        self.push Pipette.new groups
+      else
+        self._pipette groups
+      end
+      
+    end
+
+
     # Dispense the specified amount of the specified reagent to every well
     # of a container using a reagent dispenser.
     #
@@ -708,6 +868,75 @@ module Autoprotocol
       output
     end
 
+
+    # Distribute liquid to a WellGroup, sourcing the liquid from a group
+    # of wells all containing the same substance.
+    # 
+    # === Parameters
+    # 
+    # * dst_group : WellGroup
+    #     WellGroup to distribute liquid to
+    # * src_group : WellGroup
+    #     WellGroup containing the substance to be distributed
+    # * volume : str, Unit
+    #     volume of liquid to be distributed to each destination well
+    # === Returns
+    # 
+    # distributes : list
+    #     List of distribute groups
+    # 
+    # === Raises
+    # 
+    # RuntimeError
+    #     if source wells run out of liquid before distributing to all
+    #     designated destination wells
+    # RuntimeError
+    #     if length of list of volumes does not match the number of
+    #     destination wells to be distributed to
+
+    def _fill_wells(dst_group, src_group, volume)
+      src = nil
+      distributes = Array.new
+      src_group = WellGroup.new src_group
+      dst_group = WellGroup.new dst_group
+      if volume.is_a? Array
+          if volume.length != dst_group.wells.length
+              RuntimeError.new "List length of volumes provided for "
+                                 "distribution does not match the number of "
+                                 " destination wells"
+          end
+          # volume = [Unit.fromstring(x) for x in volume]
+          volume.map { |x| Unit.fromstring x }
+      else
+          volume = [Unit.fromstring(volume)] * dst_group.wells.length
+      end
+
+      src_group.wells.each { |w| 
+        distributes.push({
+          "from" => w,
+          "to" => []
+        })
+        dst_group.wells.zip(volume).each { |d, v|
+          v = Util.convert_to_ul v
+          if w.volume >= v
+            opts = {
+              "well" => d,
+              "volume" => v
+            }
+            distributes[-1]["to"].push opts
+            w.volume -= v
+            if d.volume
+              d.volume += v
+            else
+              d.volume = v
+            end
+          end 
+          } 
+        }
+        
+      distributes
+    end
+
     def _refify(op_data)
       case op_data
       when Hash
@@ -750,7 +979,7 @@ module Autoprotocol
       if self.instructions.length > 0 && self.instructions[-1].op == 'pipette'
         self.instructions[-1].groups += groups
       else
-        self.instructions.append(Pipette.new(groups: groups))
+        self.instructions.push(Pipette.new(groups: groups))
       end
     end
 
